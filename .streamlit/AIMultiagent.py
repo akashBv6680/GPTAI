@@ -24,7 +24,7 @@ from sklearn.naive_bayes import GaussianNB, MultinomialNB, ComplementNB
 from imblearn.over_sampling import SMOTE
 import xgboost as xgb
 
-from langchain_community.llms import Together
+from langchain.llms import Together
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
@@ -66,27 +66,21 @@ def ask_langchain_agent(prompt):
 
 # === Email Notification ===
 def send_email_report(subject, body, to, attachment_path=None):
-    import ssl
-
-    email_address = st.secrets["EMAIL_ADDRESS"]
-    email_password = st.secrets["EMAIL_PASSWORD"]
-
     msg = EmailMessage()
     msg['Subject'] = subject
-    msg['From'] = email_address
+    msg['From'] = st.secrets["EMAIL_ADDRESS"]
     msg['To'] = to
     msg.set_content(body)
 
     if attachment_path:
         with open(attachment_path, 'rb') as f:
-            file_data = f.read()
-            file_name = attachment_path
-        msg.add_attachment(file_data, maintype='image', subtype='png', filename=file_name)
+            img_data = f.read()
+        msg.add_attachment(img_data, maintype='image', subtype='png', filename='visual.png')
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as smtp:
-        smtp.login(email_address, email_password)
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(st.secrets["EMAIL_ADDRESS"], st.secrets["EMAIL_PASSWORD"])
         smtp.send_message(msg)
+
 # === Agent Class ===
 class AutoMLAgent:
     def __init__(self, X, y):
@@ -216,3 +210,37 @@ Akash
         """
         send_email_report("Initial Data Quality Report", eda_summary, client_email, "eda_missing.png")
         st.warning("Initial report emailed to client for confirmation before continuing.")
+
+        proceed = st.checkbox("✅ Client confirmed. Proceed with model training?")
+        if proceed:
+            target = st.selectbox("🎯 Select Target Variable", df.columns)
+            if target:
+                X = df.drop(columns=[target])
+                y = df[target]
+
+                agent = AutoMLAgent(X, y)
+                results_df, best_info = agent.run()
+
+                st.subheader("🏆 Model Leaderboard")
+                st.dataframe(results_df)
+
+                agent.save_best_model()
+                st.success(f"Best Model: {best_info['Model']} with score: {best_info['Score']}")
+
+                model_summary = f"""
+Dear Client,
+
+The AutoML process is complete. Here are the results:
+
+✅ Best Model: {best_info['Model']}
+📈 Score: {best_info['Score']}
+📊 Type: {best_info['Type']}
+🔎 Test Size: {best_info['Test Size']}
+
+Thank you for using our AI service.
+
+Regards,
+Akash
+"""
+                send_email_report("Final AutoML Model Report", model_summary, client_email)
+                st.info("📬 Final report emailed to client.")
