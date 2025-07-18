@@ -8,6 +8,7 @@ import pickle
 import smtplib
 import seaborn as sns
 import matplotlib.pyplot as plt
+import os
 
 from email.message import EmailMessage
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -65,17 +66,18 @@ def ask_langchain_agent(prompt):
     return chain.run(prompt)
 
 # === Email Notification ===
-def send_email_report(subject, body, to, attachment_path=None):
+def send_email_report(subject, body, to, attachment_paths=None):
     msg = EmailMessage()
     msg['Subject'] = subject
     msg['From'] = st.secrets["EMAIL_ADDRESS"]
     msg['To'] = to
     msg.set_content(body)
 
-    if attachment_path:
-        with open(attachment_path, 'rb') as f:
-            img_data = f.read()
-        msg.add_attachment(img_data, maintype='image', subtype='png', filename='visual.png')
+    if attachment_paths:
+        for path in attachment_paths:
+            with open(path, 'rb') as f:
+                img_data = f.read()
+            msg.add_attachment(img_data, maintype='image', subtype='png', filename=os.path.basename(path))
 
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
         smtp.login(st.secrets["EMAIL_ADDRESS"], st.secrets["EMAIL_PASSWORD"])
@@ -179,20 +181,21 @@ if uploaded_file:
     st.subheader("📊 Dataset Preview")
     st.dataframe(df.head())
 
-    # Basic EDA
     st.subheader("📉 Basic EDA")
     st.write(df.describe())
     st.write("Missing Values:")
     st.write(df.isnull().sum())
+
+    all_visuals = []
 
     fig, ax = plt.subplots()
     sns.heatmap(df.isnull(), cbar=False, cmap="viridis", ax=ax)
     plt.title("Missing Data Visualization")
     plt.tight_layout()
     plt.savefig("eda_missing.png")
+    all_visuals.append("eda_missing.png")
     st.pyplot(fig)
 
-    # Additional Visualizations
     st.subheader("📈 Client-Friendly Visual Insights")
     num_cols = df.select_dtypes(include=np.number).columns
     cat_cols = df.select_dtypes(include='object').columns
@@ -203,8 +206,8 @@ if uploaded_file:
             fig, ax = plt.subplots()
             df[col].hist(ax=ax, bins=20, color='skyblue', edgecolor='black')
             ax.set_title(f"Histogram of {col}")
-            ax.set_xlabel(col)
-            ax.set_ylabel("Frequency")
+            plt.savefig(f"hist_{col}.png")
+            all_visuals.append(f"hist_{col}.png")
             st.pyplot(fig)
 
         st.markdown("### 🧮 Box Plots (Outlier Detection)")
@@ -212,21 +215,26 @@ if uploaded_file:
             fig, ax = plt.subplots()
             sns.boxplot(data=df, x=col, ax=ax, color='lightcoral')
             ax.set_title(f"Box Plot of {col}")
+            plt.savefig(f"box_{col}.png")
+            all_visuals.append(f"box_{col}.png")
             st.pyplot(fig)
 
     if not cat_cols.empty:
         st.markdown("### 🧾 Categorical Feature Breakdown")
         for col in cat_cols:
-            st.markdown(f"**{col}**")
             fig, ax = plt.subplots()
             df[col].value_counts().plot(kind='bar', ax=ax, color='lightgreen')
             ax.set_title(f"Bar Chart of {col}")
+            plt.savefig(f"bar_{col}.png")
+            all_visuals.append(f"bar_{col}.png")
             st.pyplot(fig)
 
             fig, ax = plt.subplots()
             df[col].value_counts().plot(kind='pie', ax=ax, autopct='%1.1f%%', startangle=90)
             ax.set_ylabel("")
             ax.set_title(f"Pie Chart of {col}")
+            plt.savefig(f"pie_{col}.png")
+            all_visuals.append(f"pie_{col}.png")
             st.pyplot(fig)
 
     problem_detected = df.isnull().sum().any() or df.select_dtypes(include=np.number).apply(lambda x: ((x - x.mean())/x.std()).abs().gt(3).sum()).sum() > 0
@@ -238,14 +246,14 @@ Dear Client,
 Our system has completed the initial analysis of your dataset. Here are the key observations:
 
 - ❗ Potential data quality issues found (missing values or outliers)
-- 🧹 Visuals attached for your review (see heatmap of missing data)
+- 🧹 Visuals attached for your review (see insights)
 
 Please confirm if you'd like us to proceed with data cleaning and model training.
 
 Regards,
 Akash
         """
-        send_email_report("Initial Data Quality Report", eda_summary, client_email, "eda_missing.png")
+        send_email_report("Initial Data Quality Report", eda_summary, client_email, all_visuals)
         st.warning("Initial report emailed to client for confirmation before continuing.")
 
         proceed = st.checkbox("✅ Client confirmed. Proceed with model training?")
