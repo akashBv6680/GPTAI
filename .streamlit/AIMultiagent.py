@@ -192,6 +192,43 @@ if uploaded_file:
     plt.savefig("eda_missing.png")
     st.pyplot(fig)
 
+    # Additional Visualizations
+    st.subheader("📈 Client-Friendly Visual Insights")
+    num_cols = df.select_dtypes(include=np.number).columns
+    cat_cols = df.select_dtypes(include='object').columns
+
+    if not num_cols.empty:
+        st.markdown("### 🔢 Numeric Feature Distributions")
+        for col in num_cols:
+            fig, ax = plt.subplots()
+            df[col].hist(ax=ax, bins=20, color='skyblue', edgecolor='black')
+            ax.set_title(f"Histogram of {col}")
+            ax.set_xlabel(col)
+            ax.set_ylabel("Frequency")
+            st.pyplot(fig)
+
+        st.markdown("### 🧮 Box Plots (Outlier Detection)")
+        for col in num_cols:
+            fig, ax = plt.subplots()
+            sns.boxplot(data=df, x=col, ax=ax, color='lightcoral')
+            ax.set_title(f"Box Plot of {col}")
+            st.pyplot(fig)
+
+    if not cat_cols.empty:
+        st.markdown("### 🧾 Categorical Feature Breakdown")
+        for col in cat_cols:
+            st.markdown(f"**{col}**")
+            fig, ax = plt.subplots()
+            df[col].value_counts().plot(kind='bar', ax=ax, color='lightgreen')
+            ax.set_title(f"Bar Chart of {col}")
+            st.pyplot(fig)
+
+            fig, ax = plt.subplots()
+            df[col].value_counts().plot(kind='pie', ax=ax, autopct='%1.1f%%', startangle=90)
+            ax.set_ylabel("")
+            ax.set_title(f"Pie Chart of {col}")
+            st.pyplot(fig)
+
     problem_detected = df.isnull().sum().any() or df.select_dtypes(include=np.number).apply(lambda x: ((x - x.mean())/x.std()).abs().gt(3).sum()).sum() > 0
 
     if problem_detected and client_email:
