@@ -28,6 +28,17 @@ import xgboost as xgb
 from langchain.llms import Together
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
+from aichat_backend import (
+    handle_missing_values,
+    detect_task_type,
+    handle_imbalance,
+    regression_metrics,
+    classification_metrics,
+    ask_data_scientist_agent,
+    ask_ml_engineer_agent,
+    send_email_report
+)
+
 
 # === Together AI ===
 together_api_keys = [
