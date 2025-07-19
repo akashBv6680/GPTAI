@@ -1,43 +1,47 @@
-# ✅ Full Agentic + Multi-Agent AutoML System with Chat + EDA Email Notifications
+# ✅ Full Agentic + Multi-Agent AutoML System Backend (aichat_backend.py)
 
-import streamlit as st
+import os
+import pickle
+import requests
 import pandas as pd
 import numpy as np
-import requests
-import pickle
 import smtplib
-import seaborn as sns
-import matplotlib.pyplot as plt
-import os
-
 from email.message import EmailMessage
+
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import LabelEncoder, StandardScaler, PolynomialFeatures
-from sklearn.metrics import accuracy_score, r2_score, mean_squared_error, mean_absolute_error, confusion_matrix, classification_report, precision_score, recall_score, f1_score
+from sklearn.metrics import (
+    accuracy_score, r2_score, mean_squared_error, mean_absolute_error,
+    confusion_matrix, classification_report, precision_score, recall_score, f1_score
+)
 from sklearn.pipeline import make_pipeline
 from sklearn.linear_model import LinearRegression, Lasso, Ridge, ElasticNet, LogisticRegression
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, ExtraTreesClassifier, AdaBoostClassifier, AdaBoostRegressor
+from sklearn.ensemble import (
+    RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor,
+    RandomForestClassifier, GradientBoostingClassifier, ExtraTreesClassifier,
+    AdaBoostClassifier, AdaBoostRegressor
+)
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 from sklearn.svm import SVR, SVC
 from sklearn.naive_bayes import GaussianNB, MultinomialNB, ComplementNB
+
 from imblearn.over_sampling import SMOTE, ADASYN
 from imblearn.combine import SMOTEENN
 from imblearn.under_sampling import RandomUnderSampler
+
 import xgboost as xgb
 
 from langchain.llms import Together
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
+
 # === Together AI ===
 together_api_keys = [
     "tgp_v1_ecSsk1__FlO2mB_gAaaP2i-Affa6Dv8OCVngkWzBJUY",
     "tgp_v1_4hJBRX0XDlwnw_hhUnhP0e_lpI-u92Xhnqny2QIDAIM"
 ]
-
-client_email = st.sidebar.text_input("Enter Client Email")
 
 # === AI Prompt Functions ===
 def ask_agent(prompt, model, key=0):
@@ -68,10 +72,10 @@ def ask_langchain_agent(prompt):
     return chain.run(prompt)
 
 # === Email Notification ===
-def send_email_report(subject, body, to, attachment_paths=None):
+def send_email_report(subject, body, to, attachment_paths=None, secrets=None):
     msg = EmailMessage()
     msg['Subject'] = subject
-    msg['From'] = st.secrets["EMAIL_ADDRESS"]
+    msg['From'] = secrets["EMAIL_ADDRESS"]
     msg['To'] = to
     msg.set_content(body)
 
@@ -82,7 +86,7 @@ def send_email_report(subject, body, to, attachment_paths=None):
             msg.add_attachment(img_data, maintype='image', subtype='png', filename=os.path.basename(path))
 
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-        smtp.login(st.secrets["EMAIL_ADDRESS"], st.secrets["EMAIL_PASSWORD"])
+        smtp.login(secrets["EMAIL_ADDRESS"], secrets["EMAIL_PASSWORD"])
         smtp.send_message(msg)
 
 # === Metrics Helpers ===
@@ -106,7 +110,7 @@ def classification_metrics(y_true, y_pred):
 def detect_task_type(y):
     return "regression" if y.dtype in [np.float64, np.int64] and y.nunique() > 10 else "classification"
 
-# === Missing Value Imputation Agent ===
+# === Missing Value Imputation ===
 def handle_missing_values(df):
     if df.isnull().sum().sum() == 0:
         return df
@@ -125,7 +129,7 @@ def handle_missing_values(df):
                 df.dropna(inplace=True)
     return df
 
-# === Imbalanced Classification Handler ===
+# === Imbalanced Classification Handling ===
 def handle_imbalance(X, y):
     class_counts = y.value_counts(normalize=True)
     if class_counts.min() < 0.1:
@@ -141,9 +145,3 @@ def handle_imbalance(X, y):
         X_res, y_res = sm.fit_resample(X, y)
         return X_res, y_res
     return X, y
-
-# === Example Usage ===
-# df = handle_missing_values(df)
-# task = detect_task_type(df[target])
-# if task == 'classification':
-#     X_res, y_res = handle_imbalance(X, y)
